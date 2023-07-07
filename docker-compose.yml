@@ -1,23 +1,56 @@
-version: "3.9"
-
+version: '3.8'
 services:
+  rabbitmq:
+    container_name: rabbitmq
+    hostname: rabbitmq
+    image: rabbitmq:3.8.9-management
+    ports:
+      - 15672:15672
+      - 5672:5672
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    volumes:
+      - VOL:/path/to/mount1
+      - ./resources:/opt/resources
+    tmpfs:
+      - /var/lib/rabbitmq
+    networks:
+      mynetwork:
+        ipv4_address: 172.16.0.2
+
   clickhouse:
     container_name: clickhouse
-    image: clickhouse/clickhouse-server:22.7.2.15
+    # build:
+    #   context: ./docker
+    #   dockerfile: DockerFile
+    image: clickhouse/clickhouse-server:latest
     environment:
       - CLICKHOUSE_USER=${CLICKHOUSE_USER}
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
     volumes:
-      - ch_data:/var/lib/clickhouse/
+      - VOL:/path/to/mount2
+      - ./resources/clickhouse/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ./resources/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./entrypoint.sh:/docker-entrypoint.sh
+    tmpfs:
+      - /var/lib/clickhouse
     ports:
       - 9000:9000
       - 8123:8123
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "localhost:8123/ping"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+    #command: bash -c "cat /docker-entrypoint-initdb.d/init.sql | clickhouse-client -m -n"
+    networks:
+      mynetwork:
+        ipv4_address: 172.16.0.3
+    depends_on:
+      - "rabbitmq"
 
+networks:
+  mynetwork:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.0.0/24
 volumes:
-  ch_data:
-    driver: local
+  VOL:
+    name: VOL
